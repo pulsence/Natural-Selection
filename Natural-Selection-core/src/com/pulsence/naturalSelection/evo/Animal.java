@@ -49,8 +49,8 @@ public class Animal {
 			Animal iAnimal = null;
 			int closest = Integer.MAX_VALUE;
 			if(diet == Diet.HERBIVORE || diet == Diet.OMNIVORE) {
-				for(int x = 0; x < world.grid.grid.length; x++) {
-					for(int y = 0; y < world.grid.grid[0].length; y++) {
+				for(int x = this.x - speed; x <= this.x + speed; x++) {
+					for(int y = this.y - speed; y <= this.y + speed; y++) {
 						int dist = distance(x, y);
 						if(dist < closest) {
 							closestX = x;
@@ -61,6 +61,9 @@ public class Animal {
 				}
 			} else if (diet == Diet.CARNIVORE || diet == Diet.OMNIVORE) {
 				for(Animal animal : world.animals) {
+					if(animal == this) // you shouldn't eat yourself
+						continue;
+					
 					int dist = distance(animal.x, animal.y);
 					if(dist < closest) {
 						closestX = x;
@@ -121,7 +124,7 @@ public class Animal {
 	}
 	
 	private boolean validMove(Grid grid, int x, int y) {
-		return grid.validBlock(x, y) && grid.getBlock(x, y) != BlockType.IMPASSABLE_GROUND;
+		return grid.getBlock(x, y) != BlockType.IMPASSABLE_GROUND;
 	}
 	
 	private void updateCounters() {
@@ -132,24 +135,48 @@ public class Animal {
 	
 	private Animal mutateAnimal(Random rand) {
 		Animal child = new Animal();
-		child.size = warpValue(size, rand);
-		child.birthCount = warpValue(birthCount, rand);
-		child.lifeSpan = warpValue(lifeSpan, rand);
-		child.maxEnergy = warpValue(maxEnergy, rand);
-		child.actualEnergy = child.maxEnergy;
-		child.reproductionRate = warpValue(reproductionRate, rand);
-		child.reproductionType = ReproductionType.ASEXUAL;
-		child.speed = warpValue(speed, rand);
-		child.strength = warpValue(strength, rand);
-		child.weight = warpValue(weight, rand);
 		
-		if(rand.nextFloat() - 0.25f > 0.5f)
-			child.diet = rand.nextInt(3);
-		else
-			child.diet = diet;
+		// initially make the child a copy of the parent
+		child.birthCount = this.birthCount;
+		child.diet = this.diet;
+		child.lifeSpan = this.lifeSpan;
+		child.maxEnergy = this.maxEnergy;
+		child.reproductionRate = this.reproductionRate;
+		child.reproductionType = this.reproductionType;
+		child.size = this.size;
+		child.speed = this.speed;
+		child.strength = this.strength;
+		child.weight = this.weight;
+		child.x = this.x;
+		child.y = this.y;
 		
-		child.x = x;
-		child.y = y;
+		// now mutate a single trait
+		int trait = rand.nextInt(11);
+		switch (trait) {
+			case 0 : child.size = warpValue(size, rand);
+					 break;
+			case 1 : 
+					 break;
+			case 2 : child.birthCount = warpValue(birthCount, rand);
+				 	 break;
+			case 3 : child.lifeSpan = warpValue(lifeSpan, rand);
+				 	 break;
+			case 4 : child.maxEnergy = warpValue(maxEnergy, rand);
+					 child.actualEnergy = child.maxEnergy;
+				 	 break;
+			case 5 : child.reproductionRate = warpValue(reproductionRate, rand);
+				 	 break;
+			case 6 : child.reproductionType = ReproductionType.ASEXUAL; // this is a filler until I decide how I am going to handle sexual repro
+				 	 break;
+			case 7 : child.speed = warpValue(speed, rand);
+				 	 break;
+			case 8 : child.strength = warpValue(strength, rand);
+					 break;
+			case 9 : child.weight = warpValue(weight, rand);
+				 	 break;
+			case 10 : child.diet = rand.nextInt(3);
+				 	 break;
+		}
 		
 		return child;
 	}
