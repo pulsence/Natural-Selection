@@ -1,10 +1,9 @@
 package com.pulsence.naturalSelection;
 
-import com.badlogic.gdx.Input;
 
 public interface InputProcessor {
 	
-	public int updateState(Input input, int currentState);
+	public void initialize() ;
 	
-	public String getInput(Input input);
+	public void updateState(GameState currentState);
 }

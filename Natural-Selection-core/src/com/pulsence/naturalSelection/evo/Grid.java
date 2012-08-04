@@ -1,7 +1,7 @@
 package com.pulsence.naturalSelection.evo;
 
 public class Grid {
-	public int[][] grid;
+	public Block[][] grid;
 	
 	public Grid(int size) {
 		this(size, size);
@@ -10,18 +10,21 @@ public class Grid {
 	public Grid(int width, int height) {
 		if(width < 1 || height < 1)
 			throw new IllegalArgumentException("Width and Height must be great than 0");
-		grid = new int [width][height];
+		grid = new Block [width][height];
 	}
 	
-	public void setBlock(int value, int x, int y) {
+	public void setBlock(Block Block, int x, int y) {
 		if(!validBlock(x, y))
 			throw new IllegalArgumentException("X and Y must be on the grid");
-		grid[x][y] = value;
+		grid[x][y] = Block;
 	}
 	
-	public int getBlock(int x, int y) {
-		if(!validBlock(x, y))
-			return BlockType.IMPASSABLE_GROUND;
+	public Block getBlock(int x, int y) {
+		if(!validBlock(x, y)) {
+			Block block = new Block();
+			block.blockType = BlockType.IMPASSABLE_GROUND;
+			return block;
+		}
 		return 	grid[x][y];
 	}
 	

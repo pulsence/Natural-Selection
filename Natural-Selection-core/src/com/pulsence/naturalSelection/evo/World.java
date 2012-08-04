@@ -53,8 +53,7 @@ public class World {
 	public void step() {
 		age++;
 		for(int i = 0; i < animals.size(); i++) {
-			Animal animal = animals.get(i);
-			animal.step(this);
+			animals.get(i).step(this);
 		}
 	}
 	
@@ -72,7 +71,10 @@ public class World {
 		Grid iGrid = new Grid(width, height);
 		for(int x = 0; x < width; x++) {
 			for(int y = 0; y < height; y++) {
-				iGrid.setBlock(random.nextInt(4), x, y);
+				Block block = new Block();
+				block.blockType = random.nextInt(4);
+				block.animal = null;
+				iGrid.setBlock(block, x, y);
 			}
 		}
 		
@@ -100,15 +102,10 @@ public class World {
 		// Attempt to make sure that the animal is not place on
 		// impassable ground
 		if (!tryPosition(x, y, grid)) {
-			for (int tx = x - 1; tx < x + 2; tx++) {
-				for (int ty = y - 1; tx < y + 2; ty++) {
-					if (tryPosition(tx, ty, grid)) {
-						x = tx;
-						y = ty;
-						break;
-					}
-				}
-			}
+			Block block = new Block();
+			block.blockType = BlockType.PASSABLE_GROUND;
+			block.animal = animal;
+			grid.setBlock(block, x, y);
 		}
 		
 		animal.x = x;
@@ -124,7 +121,8 @@ public class World {
 	 * @return True if good position
 	 */
 	private static boolean tryPosition(int x, int y, Grid grid) {
-		return grid.getBlock(x, y) != BlockType.IMPASSABLE_GROUND;
+		return grid.getBlock(x, y).blockType != BlockType.IMPASSABLE_GROUND || 
+				grid.getBlock(x, y).animal != null;
 	}
 	
 	private static void setUpRandom() {

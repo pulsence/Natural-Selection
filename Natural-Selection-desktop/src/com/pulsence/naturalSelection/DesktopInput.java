@@ -1,33 +1,42 @@
 package com.pulsence.naturalSelection;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.Input.Buttons;
 import com.badlogic.gdx.Input.Keys;
 
 public class DesktopInput implements InputProcessor {
+	private Input input;
 
-	public int updateState(Input input, int currentState) {
-		if(input.isTouched()) {
-			if(currentState == GameState.SHOW_WOLRD_STATS)
-				return GameState.NORMAL;
-			else
-				return GameState.SHOW_WOLRD_STATS;
+	@Override
+	public void updateState(GameState state) {
+		if( input.isKeyPressed(Keys.SHIFT_LEFT) ||
+			input.isKeyPressed(Keys.SHIFT_RIGHT) ||
+			input.isButtonPressed(Buttons.RIGHT)) {
+			state.showWorldStats = state.showWorldStats ? false : true;
 		}
 		
 		if(input.isKeyPressed(Keys.P) || input.isKeyPressed(Keys.SPACE)) {
-			if(currentState == GameState.PAUSED)
-				return GameState.NORMAL;
-			else
-				return GameState.PAUSED;
+			state.pause = state.pause ? false : true;
+			state.showWorldStats = state.pause;
 		}
 		
-		if(input.isKeyPressed(Keys.ESCAPE))
-			return GameState.END;
+		if(input.isButtonPressed(Buttons.LEFT)) {
+			state.animalSelected = state.animalSelected ? false : true;
+		}
 		
-		return GameState.NO_CHANGE;
+		if(input.isKeyPressed(Keys.ESCAPE)) {
+			state.endGame = true;
+		}
+		
+		if(input.isKeyPressed(Keys.R)) {
+			state.reset = true;
+		}
 	}
 
-	public String getInput(Input input) {
-		return null;
+	@Override
+	public void initialize() {
+		input = Gdx.input;
 	}
 
 }

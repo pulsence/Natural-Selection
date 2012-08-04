@@ -25,17 +25,19 @@ public class Animal {
 		//Die of age/starvation
 		if(age >= lifeSpan || actualEnergy <= 0) {
 			world.animals.remove(this);
-			age++;
+			world.grid.getBlock(x, y).animal = null;
 			return;
 		}
 		
-		Random rand = World.random;
-		
 		//Have a child
-		if((reproductionRate - stepSinceReproduce) * rand.nextFloat() < 2 &&
+		if((reproductionRate - stepSinceReproduce) * World.random.nextFloat() < 2 &&
 				world.animals.size() + birthCount < world.maxPopulation) {
 			for(int i = 0; i < birthCount; i++) {
-				world.animals.add(mutateAnimal(rand));
+				Animal child = mutateAnimal(World.random, world.grid);
+				if(child != null) {
+					world.animals.add(child);
+					world.grid.getBlock(child.x, child.y).animal = child;
+				}
 			}
 			stepSinceReproduce = -1;
 			updateCounters();
@@ -43,14 +45,18 @@ public class Animal {
 		}
 		
 		//Look for food
-		if(actualEnergy * rand.nextDouble() < 15) {
+		if(actualEnergy * World.random.nextDouble() < 15) {
 			int closestX = 0;
 			int closestY = 0;
-			Animal iAnimal = null;
+			Block block;
 			int closest = Integer.MAX_VALUE;
-			if(diet == Diet.HERBIVORE || diet == Diet.OMNIVORE) {
-				for(int x = this.x - speed; x <= this.x + speed; x++) {
-					for(int y = this.y - speed; y <= this.y + speed; y++) {
+			
+			for(int x = this.x - speed; x <= this.x + speed; x++) {
+				for(int y = this.y - speed; y <= this.y + speed; y++) {
+					block = world.grid.getBlock(x, y);
+					if( (block.blockType == BlockType.VEGETATION && diet == Diet.HERBIVORE) ||
+						(block.animal != null && diet == Diet.CARNIVORE) ||
+						((block.blockType == BlockType.VEGETATION || block.animal != null) && diet == Diet.OMNIVORE)) {
 						int dist = distance(x, y);
 						if(dist < closest) {
 							closestX = x;
@@ -59,21 +65,9 @@ public class Animal {
 						}
 					}
 				}
-			} else if (diet == Diet.CARNIVORE || diet == Diet.OMNIVORE) {
-				for(Animal animal : world.animals) {
-					if(animal == this) // you shouldn't eat yourself
-						continue;
-					
-					int dist = distance(animal.x, animal.y);
-					if(dist < closest) {
-						closestX = x;
-						closestY = y;
-						iAnimal = animal;
-						closest = dist;
-					}
-				}
 			}
 			
+			world.grid.getBlock(x, y).animal = null;			
 			for(int i = 0; i < speed; i++) {
 				if(closestY < y && validMove(world.grid, x, y - 1)) { //Move down
 					y--;
@@ -88,18 +82,24 @@ public class Animal {
 					if(actualEnergy > maxEnergy) {
 						actualEnergy = maxEnergy;
 					}
-					if(iAnimal != null)
-						world.animals.remove(iAnimal);
+					
+					block = world.grid.getBlock(x, y);
+					if(block.animal != null) {
+						world.animals.remove(block.animal);
+						block.animal = null;
+					}
 					break;
 				}
 			}
+			world.grid.getBlock(x, y).animal = this;
 			updateCounters();
 			return;
 		}
 		
 		//Wonder aimlessly
+		world.grid.getBlock(x, y).animal = null;	
 		for(int i = 0; i < speed; i++) {
-			int direction = rand.nextInt(4);
+			int direction = World.random.nextInt(4);
 			if(direction == 0 && validMove(world.grid, x, y - 1)) { //Move down
 				y--;
 			} else if (direction == 1 && validMove(world.grid, x, y + 1)) { //Move up
@@ -111,20 +111,21 @@ public class Animal {
 			}
 			
 			if((diet == Diet.HERBIVORE || diet == Diet.OMNIVORE) &&
-					world.grid.getBlock(x, y) == BlockType.VEGETATION) {
+					world.grid.getBlock(x, y).blockType == BlockType.VEGETATION) {
 				actualEnergy += 5;
 				if(actualEnergy > maxEnergy) {
 					actualEnergy = maxEnergy;
 				}
 			}
-			
 		}
+		world.grid.getBlock(x, y).animal = this;
 		
 		updateCounters();
 	}
 	
 	private boolean validMove(Grid grid, int x, int y) {
-		return grid.getBlock(x, y) != BlockType.IMPASSABLE_GROUND;
+		return grid.getBlock(x, y).blockType != BlockType.IMPASSABLE_GROUND || 
+			   grid.getBlock(x, y).animal != null;
 	}
 	
 	private void updateCounters() {
@@ -133,7 +134,7 @@ public class Animal {
 		age++;
 	}
 	
-	private Animal mutateAnimal(Random rand) {
+	private Animal mutateAnimal(Random rand, Grid grid) {
 		Animal child = new Animal();
 		
 		// initially make the child a copy of the parent
@@ -147,15 +148,13 @@ public class Animal {
 		child.speed = this.speed;
 		child.strength = this.strength;
 		child.weight = this.weight;
-		child.x = this.x;
-		child.y = this.y;
 		
 		// now mutate a single trait
 		int trait = rand.nextInt(11);
 		switch (trait) {
 			case 0 : child.size = warpValue(size, rand);
 					 break;
-			case 1 : 
+			case 1 : // Do nothing to the animal
 					 break;
 			case 2 : child.birthCount = warpValue(birthCount, rand);
 				 	 break;
@@ -177,6 +176,21 @@ public class Animal {
 			case 10 : child.diet = rand.nextInt(3);
 				 	 break;
 		}
+		
+		child.x = -1;
+		child.y = -1;
+		for(int tx = x - 1; tx < x + 2; tx++) {
+			for(int ty = y - 1; ty < y + 2; ty++) {
+				if(validMove(grid, tx, ty)) {
+					child.x = tx;
+					child.y = ty;
+					break;
+				}
+			}
+		}
+		
+		if(child.x == -1) // This means that there is no room around the parent to place the child
+			child = null;
 		
 		return child;
 	}

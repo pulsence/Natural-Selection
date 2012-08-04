@@ -1,22 +1,29 @@
 package com.pulsence.naturalSelection;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.Input.Keys;
 
 public class AndroidInput implements InputProcessor {
+	private Input input;
 
-	public int updateState(Input input, int currentState) {
-		if(input.isTouched()) {
-			if(currentState == GameState.SHOW_WOLRD_STATS)
-				return GameState.NORMAL;
-			else
-				return GameState.SHOW_WOLRD_STATS;
+	public void updateState(GameState state) {
+		if(input.isTouched() ||  input.justTouched()) {
+			state.animalSelected = state.animalSelected ? false : true;
 		}
-			
-		return GameState.NO_CHANGE;
+		
+		if(input.isTouched(0) && input.isTouched(1)) {
+			state.showWorldStats = state.showWorldStats ? false : true;
+		}
+		
+		if(input.isKeyPressed(Keys.BACK)) {
+			state.reset = true;
+		}
 	}
 
-	public String getInput(Input input) {
-		return null;
+	public void initialize() {
+		input = Gdx.input;
+		input.setCatchBackKey(true);
 	}
 
 }
