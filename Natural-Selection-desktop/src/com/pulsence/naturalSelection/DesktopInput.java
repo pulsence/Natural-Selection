@@ -22,7 +22,7 @@ public class DesktopInput implements InputProcessor {
 		}
 		
 		if(input.isButtonPressed(Buttons.LEFT)) {
-			state.animalSelected = state.animalSelected ? false : true;
+			state.animalSelected = true;
 		}
 		
 		if(input.isKeyPressed(Keys.ESCAPE)) {

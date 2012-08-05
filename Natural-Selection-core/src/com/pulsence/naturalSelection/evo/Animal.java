@@ -12,7 +12,7 @@ public class Animal {
 	public int maxEnergy;
 	public int diet;
 	public int strength;
-	public int lifeSpan;	
+	public int lifeSpan;
 	
 	public int x;
 	public int y;
@@ -21,11 +21,14 @@ public class Animal {
 	public int actualEnergy;
 	private int stepSinceReproduce = 0;
 	
+	public boolean alive = true;
+	
 	public void step(World world) {
 		//Die of age/starvation
 		if(age >= lifeSpan || actualEnergy <= 0) {
 			world.animals.remove(this);
 			world.grid.getBlock(x, y).animal = null;
+			alive = true;
 			return;
 		}
 		
@@ -84,8 +87,9 @@ public class Animal {
 					}
 					
 					block = world.grid.getBlock(x, y);
-					if(block.animal != null) {
+					if(block.animal != null && diet != Diet.HERBIVORE) {
 						world.animals.remove(block.animal);
+						block.animal.alive = false;
 						block.animal = null;
 					}
 					break;

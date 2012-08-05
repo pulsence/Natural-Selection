@@ -5,9 +5,12 @@ import com.badlogic.gdx.ApplicationListener;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL10;
 import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureAtlas;
+import com.badlogic.gdx.math.Vector3;
+import com.pulsence.naturalSelection.evo.Animal;
 import com.pulsence.naturalSelection.evo.Block;
 import com.pulsence.naturalSelection.evo.BlockType;
 import com.pulsence.naturalSelection.evo.Diet;
@@ -16,14 +19,15 @@ import com.pulsence.naturalSelection.evo.World;
 public class NaturalSelection implements ApplicationListener {
 	private OrthographicCamera camera;
 	private SpriteBatch batch;
-	
-	private Texture ground;
-	private Texture impassableGround;
-	private Texture water;
-	private Texture vegetation;
-	private Texture herbivore;
-	private Texture omnivore;
-	private Texture carnivore;
+
+	private TextureAtlas atlas;
+	private Sprite ground;
+	private Sprite impassableGround;
+	private Sprite water;
+	private Sprite vegetation;
+	private Sprite herbivore;
+	private Sprite omnivore;
+	private Sprite carnivore;
 	
 	private BitmapFont font;
 	
@@ -32,6 +36,7 @@ public class NaturalSelection implements ApplicationListener {
 	private GameState gameState;
 	
 	private int framesSinceInput;
+	private int framesSinceClean;
 	private InputProcessor inputProcessor;
 	
 	private int BASEBLOCKSIZE;
@@ -56,13 +61,14 @@ public class NaturalSelection implements ApplicationListener {
 	    camera.setToOrtho(false, screenWidth, screenHeight);
 		batch = new SpriteBatch();
 		
-		ground = new Texture(Gdx.files.internal("textures/ground.png"));
-		impassableGround = new Texture(Gdx.files.internal("textures/impassable_ground.png"));
-		water = new Texture(Gdx.files.internal("textures/water.png"));
-		vegetation = new Texture(Gdx.files.internal("textures/vegetation.png"));
-		herbivore = new Texture(Gdx.files.internal("textures/herbivore.png"));
-		omnivore = new Texture(Gdx.files.internal("textures/omnivore.png"));
-		carnivore = new Texture(Gdx.files.internal("textures/carnivore.png"));
+		atlas = new TextureAtlas(Gdx.files.internal("packed/pack.pack"));
+		ground =  atlas.createSprite("ground");
+		impassableGround =  atlas.createSprite("impassable");
+		water =  atlas.createSprite("water");
+		vegetation =  atlas.createSprite("vegetation");
+		herbivore =  atlas.createSprite("herbivore");
+		omnivore =  atlas.createSprite("omnivore");
+		carnivore =  atlas.createSprite("carnivore");
 		
 		font = new BitmapFont();
 		font.setColor(1, 1, 1, 1);
@@ -79,13 +85,7 @@ public class NaturalSelection implements ApplicationListener {
 	public void dispose() {
 		batch.dispose();
 		
-		ground.dispose();
-		impassableGround.dispose();
-		water.dispose();
-		vegetation.dispose();
-		herbivore.dispose();
-		omnivore.dispose();
-		carnivore.dispose();
+		atlas.dispose();
 	}
 
 	@Override
@@ -106,6 +106,11 @@ public class NaturalSelection implements ApplicationListener {
 		}
 		framesSinceInput++;
 		
+		if(gameState.animal != null && !gameState.animal.alive) {
+			gameState.animalSelected = false;
+			gameState.animal = null;
+		}
+		
 		if(gameState.reset) {
 			createWorld();
 			gameState = new GameState();
@@ -115,12 +120,41 @@ public class NaturalSelection implements ApplicationListener {
 			world.step();
 			stats.updateStatistics(world);
 		}
+		
+		// This cleans up the animal list. Required until I get the grid transitions finished
+		if(framesSinceClean > 9) {
+			framesSinceClean = -1;
+			cleanAnimals();
+		}
+		framesSinceClean++;
+		
+	}
+	
+	private void cleanAnimals() {
+		world.animals.clear();
+		for(int x = 0; x < world.getWidth(); x++) {
+			for(int y = 0; y < world.getHeight(); y++) {
+				Animal animal = world.grid.getBlock(x, y).animal;
+				if(animal != null)
+					world.animals.add(animal);
+			}
+		}
 	}
 	
 	private void processInput() {
 		inputProcessor.updateState(gameState);
 		if(gameState.endGame) {
 			Gdx.app.exit();
+		}
+		
+		if(gameState.animalSelected && gameState.animal == null) {
+			Vector3 touchPos = new Vector3();
+			touchPos.set(Gdx.input.getX(), Gdx.input.getY(), 0);
+			camera.unproject(touchPos);
+			int x = (int)touchPos.x / blockWidth;
+			int y = (int)touchPos.y / blockWidth;
+			gameState.animal = world.grid.getBlock(x, y).animal;
+			gameState.animalSelected = gameState.animal != null;
 		}
 	}
 	
@@ -138,7 +172,10 @@ public class NaturalSelection implements ApplicationListener {
 			renderPause();
 		
 		if(gameState.showWorldStats)
-			renderWorldStates();
+			renderWorldStats();
+		
+		if(gameState.animalSelected)
+			renderAnimalStats();
 		
 		batch.end();
 	}
@@ -175,7 +212,7 @@ public class NaturalSelection implements ApplicationListener {
 		font.draw(batch, "Paused", screenWidth / 2, screenHeight / 2);
 	}
 	
-	private void renderWorldStates() {
+	private void renderWorldStats() {
 		StringBuilder str = new StringBuilder("World Stats\n");
 		str.append("FPS: " + Gdx.graphics.getFramesPerSecond() + "\n").
 			append("World Age: " + stats.worldAge + "\n").
@@ -185,6 +222,14 @@ public class NaturalSelection implements ApplicationListener {
 			append("Hebivores: " + stats.herbivores + "\n").
 			append("Average Age: " + stats.averageAge + "\n");
 		font.drawMultiLine(batch, str, 5, screenHeight);
+	}
+	
+	private void renderAnimalStats() {
+		StringBuilder str = new StringBuilder("Animal Stats\n");
+		str.append("Age: " + gameState.animal.age + "\n").
+			append("Diet: " + Diet.getDiet(gameState.animal.diet) + "\n").
+			append("Speed: " + gameState.animal.speed);
+		font.drawMultiLine(batch, str, screenWidth - 150, screenHeight);
 	}
 	
 	@Override

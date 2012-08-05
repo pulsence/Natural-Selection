@@ -9,7 +9,7 @@ public class AndroidInput implements InputProcessor {
 
 	public void updateState(GameState state) {
 		if(input.isTouched() ||  input.justTouched()) {
-			state.animalSelected = state.animalSelected ? false : true;
+			state.animalSelected = true;
 		}
 		
 		if(input.isTouched(0) && input.isTouched(1)) {
