@@ -36,4 +36,15 @@ public class WorldStatistics {
 		}
 		averageAge /= i;
 	}
+	
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder("Animals: " + animals + "\n");
+		sb.append("Carnivores :" + carnivores + "\n").
+		   append("Herbivores :" + herbivores + "\n").
+		   append("Omnivores :" + omnivores + "\n").
+		   append("World Age :" + worldAge + "\n").
+		   append("Average Animal Age :" + averageAge + "\n");
+		return sb.toString();
+	}
 }

@@ -10,6 +10,10 @@ import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.TextField;
+import com.badlogic.gdx.scenes.scene2d.ui.tablelayout.Table;
 import com.pulsence.naturalSelection.evo.Animal;
 import com.pulsence.naturalSelection.evo.Block;
 import com.pulsence.naturalSelection.evo.BlockType;
@@ -45,6 +49,17 @@ public class NaturalSelection implements ApplicationListener {
 	private int screenWidth;
 	private int screenHeight;
 	
+	private Stage uiStage;
+	private Table gameUI;
+	private Label worldStats;
+	private Label animalStats;
+	
+	private Table pauseMenu;
+	private Label pauseLabel;
+	private Label animalAgeLabel;
+	private TextField animalAgeField;
+	
+	
 	public NaturalSelection (InputProcessor inputProcessor) {
 		super();
 		this.inputProcessor = inputProcessor;
@@ -59,6 +74,9 @@ public class NaturalSelection implements ApplicationListener {
 		
 		camera = new OrthographicCamera();
 	    camera.setToOrtho(false, screenWidth, screenHeight);
+
+		Gdx.gl.glClearColor(34f/255f, 177f/255f, 76f/255f, 1); // Same color as the ground
+	    
 		batch = new SpriteBatch();
 		
 		atlas = new TextureAtlas(Gdx.files.internal("packed/pack.pack"));
@@ -79,6 +97,43 @@ public class NaturalSelection implements ApplicationListener {
 		
 		gameState = new GameState();
 		stats = new WorldStatistics();
+
+		// UI Stuff
+        uiStage = new Stage(screenWidth, screenHeight, true, batch);
+        Gdx.input.setInputProcessor(uiStage);
+        
+        gameUI = new Table();
+        gameUI.setFillParent(true);
+        gameUI.top().left();
+        uiStage.addActor(gameUI);
+        
+        Label.LabelStyle style = new Label.LabelStyle(font, font.getColor());
+        worldStats = new Label("", style);
+        worldStats.visible = false;
+        gameUI.add(worldStats).center().left().expandX();
+        
+        animalStats = new Label("", style);
+        animalStats.visible = false;
+        gameUI.add(animalStats).center().left();
+        gameUI.row();
+        setupPauseMenu();
+	}
+	
+	private void setupPauseMenu() {
+        Label.LabelStyle style = new Label.LabelStyle(font, font.getColor());
+        pauseMenu = new Table();
+        pauseMenu.visible = false;
+        gameUI.add(pauseMenu).center();
+
+        pauseLabel = new Label("Paused", style);
+        pauseMenu.add(pauseLabel);
+        pauseMenu.row();
+        
+        animalAgeLabel = new Label("Age", style);
+        pauseMenu.add(animalAgeLabel);
+        //animalAgeField = new TextField("", new TextField.TextFieldStyle(font, font.getColor(), font, font.getColor(), cursor, selection, background));
+        pauseMenu.add(animalAgeField);
+        
 	}
 
 	@Override
@@ -106,8 +161,7 @@ public class NaturalSelection implements ApplicationListener {
 		}
 		framesSinceInput++;
 		
-		if(gameState.animal != null && !gameState.animal.alive) {
-			gameState.animalSelected = false;
+		if(gameState.animal != null && !world.animals.contains(gameState.animal)) {;
 			gameState.animal = null;
 		}
 		
@@ -128,6 +182,13 @@ public class NaturalSelection implements ApplicationListener {
 		}
 		framesSinceClean++;
 		
+		if(gameState.showWorldStats)
+			prepareWorldStats();
+		
+		if(gameState.animal != null)
+			prepareAnimalStats();
+		else
+			animalStats.visible = false;
 	}
 	
 	private void cleanAnimals() {
@@ -147,37 +208,45 @@ public class NaturalSelection implements ApplicationListener {
 			Gdx.app.exit();
 		}
 		
-		if(gameState.animalSelected && gameState.animal == null) {
+		if(gameState.animalSelected) {
 			Vector3 touchPos = new Vector3();
 			touchPos.set(Gdx.input.getX(), Gdx.input.getY(), 0);
 			camera.unproject(touchPos);
 			int x = (int)touchPos.x / blockWidth;
 			int y = (int)touchPos.y / blockWidth;
 			gameState.animal = world.grid.getBlock(x, y).animal;
-			gameState.animalSelected = gameState.animal != null;
+			gameState.animalSelected = false;
 		}
+
+		animalStats.visible = gameState.animal != null;
+		worldStats.visible = gameState.showWorldStats;
+		
+		pauseMenu.visible = gameState.pause;
+		if(gameState.pause && gameState.animal != null) {
+			//animalAgeField.setRange(0, gameState.animal.lifeSpan);
+			animalAgeLabel.setText("Age: " + gameState.animal.age);
+		}
+		
+	}
+	
+	private void prepareWorldStats() {
+		StringBuilder sb = new StringBuilder("FPS:" + Gdx.graphics.getFramesPerSecond() + "\n");
+		sb.append(stats);
+		worldStats.setText(sb);
+	}
+	
+	private void prepareAnimalStats() {
+		animalStats.setText(gameState.animal.toString());
 	}
 	
 	private void draw() {
-		Gdx.gl.glClearColor(34f/255f, 177f/255f, 76f/255f, 1); // Same color as the ground
 		Gdx.gl.glClear(GL10.GL_COLOR_BUFFER_BIT);
 		
-		camera.update();
 		batch.setProjectionMatrix(camera.combined);
 		batch.begin();
-		// Render the world
-		renderWorld();
-		
-		if(gameState.pause)
-			renderPause();
-		
-		if(gameState.showWorldStats)
-			renderWorldStats();
-		
-		if(gameState.animalSelected)
-			renderAnimalStats();
-		
+		renderWorld();		
 		batch.end();
+        uiStage.draw();
 	}
 
 	private void renderWorld() {
@@ -208,39 +277,17 @@ public class NaturalSelection implements ApplicationListener {
 		}
 	}
 	
-	private void renderPause() {
-		font.draw(batch, "Paused", screenWidth / 2, screenHeight / 2);
-	}
-	
-	private void renderWorldStats() {
-		StringBuilder str = new StringBuilder("World Stats\n");
-		str.append("FPS: " + Gdx.graphics.getFramesPerSecond() + "\n").
-			append("World Age: " + stats.worldAge + "\n").
-			append("Animals: " + stats.animals + "\n").
-			append("Carnivores: " + stats.carnivores + "\n").
-			append("Omnivores: " + stats.omnivores + "\n").
-			append("Hebivores: " + stats.herbivores + "\n").
-			append("Average Age: " + stats.averageAge + "\n");
-		font.drawMultiLine(batch, str, 5, screenHeight);
-	}
-	
-	private void renderAnimalStats() {
-		StringBuilder str = new StringBuilder("Animal Stats\n");
-		str.append("Age: " + gameState.animal.age + "\n").
-			append("Diet: " + Diet.getDiet(gameState.animal.diet) + "\n").
-			append("Speed: " + gameState.animal.speed);
-		font.drawMultiLine(batch, str, screenWidth - 150, screenHeight);
-	}
-	
 	@Override
 	public void resize(int width, int height) {
 		camera.setToOrtho(false, width, height);
-		
+		camera.update(true);
 		blockWidth = width / world.getWidth();
 		blockHeight = height / world.getHeight();
 		
 		screenWidth = width;
 		screenHeight = height;
+		
+		uiStage.setViewport(width, height, true);
 	}
 
 	@Override

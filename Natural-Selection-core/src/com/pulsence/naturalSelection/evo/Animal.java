@@ -21,14 +21,11 @@ public class Animal {
 	public int actualEnergy;
 	private int stepSinceReproduce = 0;
 	
-	public boolean alive = true;
-	
 	public void step(World world) {
 		//Die of age/starvation
 		if(age >= lifeSpan || actualEnergy <= 0) {
 			world.animals.remove(this);
 			world.grid.getBlock(x, y).animal = null;
-			alive = true;
 			return;
 		}
 		
@@ -89,7 +86,6 @@ public class Animal {
 					block = world.grid.getBlock(x, y);
 					if(block.animal != null && diet != Diet.HERBIVORE) {
 						world.animals.remove(block.animal);
-						block.animal.alive = false;
 						block.animal = null;
 					}
 					break;
@@ -209,5 +205,15 @@ public class Animal {
 		double yy = Math.pow((y - gridY), 2);
 		double distance = Math.sqrt(xx + yy);
 		return (int) Math.round(distance);
+	}
+	
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder("Animal\n");
+		sb.append("Age: " + age + "\n").
+		   append("Diet :" + Diet.getDiet(diet) + "\n").
+		   append("Speed :" + speed + "\n").
+		   append("Energy :" + actualEnergy + "\n");
+		return sb.toString();
 	}
 }
