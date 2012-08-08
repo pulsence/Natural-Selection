@@ -128,8 +128,9 @@ public class Animal {
 	}
 	
 	private boolean validMove(Grid grid, int x, int y) {
-		return grid.getBlock(x, y).blockType != BlockType.IMPASSABLE_GROUND || 
-			   grid.getBlock(x, y).animal != null;
+		Block block = grid.getBlock(x, y);
+		return block.blockType != BlockType.IMPASSABLE_GROUND || 
+			   block.animal != null;
 	}
 	
 	private void updateCounters() {
