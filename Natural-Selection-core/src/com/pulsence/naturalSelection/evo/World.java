@@ -13,6 +13,9 @@ public class World {
 	private static int INITIAL_ANIMALS = 10;
 	public static Random random;
 	
+	public int width;
+	public int height;
+	
 	public World() {
 		this(INITIAL_SIZE, INITIAL_ANIMALS);
 	}
@@ -38,16 +41,9 @@ public class World {
 		for(int i = 0; i < initialAnimals; i++) {
 			animals.add(createRandomAnimal(width, height, grid));
 		}
-	}
-	
-	public World(int width, int height, ArrayList<Animal> animals) {
-		this(createRandomGrid(width, height), animals);
-	}
-	
-	public World(Grid grid, ArrayList<Animal> animals) {
-		setUpRandom();
-		this.grid = grid;
-		this.animals = animals;
+		
+		this.width = grid.getWidth();
+		this.height = grid.getHeight();
 	}
 	
 	public void step() {
@@ -58,38 +54,93 @@ public class World {
 	}
 	
 	public int getWidth() {
-		return grid.getWidth();
+		return width;
 	}
 	
 	public int getHeight() {
-		return grid.getHeight();
+		return height;
 	}
 	
 	public static Grid createRandomGrid(int width, int height) {
 		setUpRandom();
 		
 		Grid iGrid = new Grid(width, height);
+		
+//		for(int x = 0; x < width; x++) {
+//			for(int y = 0; y < height; y++) {
+//				Block block = new Block();
+//				block.blockType = random.nextInt(4);
+//				block.animal = null;
+//				iGrid.setBlock(block, x, y);
+//			}
+//		}
+		
+		// Create all ground
 		for(int x = 0; x < width; x++) {
 			for(int y = 0; y < height; y++) {
 				Block block = new Block();
-				block.blockType = random.nextInt(4);
+				block.blockType = BlockType.PASSABLE_GROUND;
 				block.animal = null;
 				iGrid.setBlock(block, x, y);
 			}
 		}
 		
+		int centerX;
+		int centerY;
+		int radius;
+		
+		// Create mountains
+		int mountains = random.nextInt(10);
+		for(int i = 0; i < mountains; i++) {
+			centerX = random.nextInt(width);
+			centerY = random.nextInt(height);
+			radius = random.nextInt(Math.min(width, height) / 2);
+			loadGrid(iGrid, centerX, centerY, radius, BlockType.IMPASSABLE_GROUND);
+		}
+		
+		// Create lakes
+		int lakes = random.nextInt(10);
+		for(int i = 0; i < lakes; i++) {
+			centerX = random.nextInt(width);
+			centerY = random.nextInt(height);
+			radius = random.nextInt(Math.min(width, height) / 2);
+			loadGrid(iGrid, centerX, centerY, radius, BlockType.WATER);
+		}
+		
+		// Create plains
+		int plains = random.nextInt(10);
+		for(int i = 0; i < plains; i++) {
+			centerX = random.nextInt(width);
+			centerY = random.nextInt(height);
+			radius = random.nextInt(Math.min(width, height) / 2);
+			loadGrid(iGrid, centerX, centerY, radius, BlockType.VEGETATION);
+		}
+		
 		return iGrid;
+	}
+	
+	private static void loadGrid(Grid grid, int centerX, int centerY, int radius, int blockType) {
+		for(int x = centerX - radius; x < centerX + radius; x++) {
+			for(int y = centerY - radius; y < centerY + radius; y++) {
+				if(grid.validBlock(x, y) && random.nextInt(5) > 2) {
+					Block block = new Block();
+					block.blockType = blockType;
+					block.animal = null;
+					grid.setBlock(block, x, y);
+				}
+			}
+		}
 	}
 	
 	public static Animal createRandomAnimal(int worldWidth, int worldHeight, Grid grid) {
 		setUpRandom();
 		
 		Animal animal = new Animal();
-		animal.birthCount = random.nextInt(3);
+		animal.birthCount = random.nextInt(6);
 		animal.diet = random.nextInt(3);
 		animal.maxEnergy = random.nextInt(100);
 		animal.actualEnergy = animal.maxEnergy;
-		animal.lifeSpan = random.nextInt(100);
+		animal.lifeSpan = random.nextInt(50);
 		animal.reproductionRate = random.nextInt(100);
 		animal.reproductionType = ReproductionType.ASEXUAL;
 		animal.size = random.nextInt(4);
@@ -101,7 +152,7 @@ public class World {
 		int y = random.nextInt(worldHeight);
 		// Attempt to make sure that the animal is not place on
 		// impassable ground
-		if (!tryPosition(x, y, grid)) {
+		if (!Animal.validMove(grid, animal, x, y)) {
 			Block block = new Block();
 			block.blockType = BlockType.PASSABLE_GROUND;
 			block.animal = animal;
@@ -111,18 +162,6 @@ public class World {
 		animal.x = x;
 		animal.y = y;
 		return animal;
-	}
-	
-	/**
-	 * 
-	 * @param x
-	 * @param y
-	 * @param grid
-	 * @return True if good position
-	 */
-	private static boolean tryPosition(int x, int y, Grid grid) {
-		return grid.getBlock(x, y).blockType != BlockType.IMPASSABLE_GROUND || 
-				grid.getBlock(x, y).animal != null;
 	}
 	
 	private static void setUpRandom() {

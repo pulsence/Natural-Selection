@@ -12,8 +12,9 @@ import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
-import com.badlogic.gdx.scenes.scene2d.ui.TextField;
+import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.tablelayout.Table;
+import com.badlogic.gdx.utils.Logger;
 import com.pulsence.naturalSelection.evo.Animal;
 import com.pulsence.naturalSelection.evo.Block;
 import com.pulsence.naturalSelection.evo.BlockType;
@@ -21,6 +22,10 @@ import com.pulsence.naturalSelection.evo.Diet;
 import com.pulsence.naturalSelection.evo.World;
 
 public class NaturalSelection implements ApplicationListener {
+	// Command line args
+	public static boolean DEBUG = false;
+	
+	// Graphics
 	private OrthographicCamera camera;
 	private SpriteBatch batch;
 
@@ -39,16 +44,25 @@ public class NaturalSelection implements ApplicationListener {
 	private WorldStatistics stats;
 	private GameState gameState;
 	
+	// Helpers
 	private int framesSinceInput;
 	private int framesSinceClean;
 	private InputProcessor inputProcessor;
 	
 	private int BASEBLOCKSIZE;
-	private int blockWidth;
-	private int blockHeight;
+	private float blockWidth;
+	private float blockHeight;
 	private int screenWidth;
 	private int screenHeight;
 	
+	private Vector3 touchPos;
+	
+	private long startTime;
+	private long targetFPS;
+	private long endTime;
+	private long delta;
+	
+	// UI fields
 	private Stage uiStage;
 	private Table gameUI;
 	private Label worldStats;
@@ -57,8 +71,11 @@ public class NaturalSelection implements ApplicationListener {
 	private Table pauseMenu;
 	private Label pauseLabel;
 	private Label animalAgeLabel;
-	private TextField animalAgeField;
-	
+	private TextButton animalAgeButton;
+	private Label animalDietLabel;
+	private Label animalSpeedLabel;
+	private Label animalCanFlyLabel;
+	private Label animalCanSwimLabel;
 	
 	public NaturalSelection (InputProcessor inputProcessor) {
 		super();
@@ -67,6 +84,16 @@ public class NaturalSelection implements ApplicationListener {
 	
 	@Override
 	public void create() {
+		if(DEBUG) {
+			Gdx.app.setLogLevel(Logger.DEBUG);
+			Gdx.graphics.setVSync(false);
+			targetFPS = 0;
+		} else {
+			Gdx.app.setLogLevel(Logger.NONE);
+			Gdx.graphics.setVSync(true);
+			targetFPS = 1000 / 30; // Goal of 32 frames per second
+		}
+		
 		inputProcessor.initialize();
 		
 		screenWidth = Gdx.graphics.getWidth();
@@ -98,6 +125,8 @@ public class NaturalSelection implements ApplicationListener {
 		gameState = new GameState();
 		stats = new WorldStatistics();
 
+		 touchPos = new Vector3();
+		
 		// UI Stuff
         uiStage = new Stage(screenWidth, screenHeight, true, batch);
         Gdx.input.setInputProcessor(uiStage);
@@ -129,11 +158,25 @@ public class NaturalSelection implements ApplicationListener {
         pauseMenu.add(pauseLabel);
         pauseMenu.row();
         
-        animalAgeLabel = new Label("Age", style);
+        animalAgeLabel = new Label("Age: N/A", style);
         pauseMenu.add(animalAgeLabel);
-        //animalAgeField = new TextField("", new TextField.TextFieldStyle(font, font.getColor(), font, font.getColor(), cursor, selection, background));
-        pauseMenu.add(animalAgeField);
+        pauseMenu.row();
         
+        animalDietLabel = new Label("Diet: N/A", style);
+        pauseMenu.add(animalDietLabel);
+        pauseMenu.row();
+        
+    	animalSpeedLabel = new Label("Speed: N/A", style);
+        pauseMenu.add(animalSpeedLabel);
+        pauseMenu.row();
+        
+    	animalCanFlyLabel = new Label("Can Fly: N/A", style);
+        pauseMenu.add(animalCanFlyLabel);
+        pauseMenu.row();
+        
+    	animalCanSwimLabel = new Label("Can Swim: N/A", style);
+        pauseMenu.add(animalCanSwimLabel);
+        pauseMenu.row();
 	}
 
 	@Override
@@ -145,8 +188,16 @@ public class NaturalSelection implements ApplicationListener {
 
 	@Override
 	public void render() {
+		startTime = System.currentTimeMillis();
 		update();
 		draw();
+		endTime = System.currentTimeMillis();
+		delta = endTime - startTime;
+		delta = targetFPS - delta;
+		try {
+			if(delta > 0)
+				Thread.sleep(delta);
+		} catch (InterruptedException e) { } // Do nothing
 	}
 	
 	private void update() {
@@ -176,7 +227,7 @@ public class NaturalSelection implements ApplicationListener {
 		}
 		
 		// This cleans up the animal list. Required until I get the grid transitions finished
-		if(framesSinceClean > 9) {
+		if(framesSinceClean > 6) {
 			framesSinceClean = -1;
 			cleanAnimals();
 		}
@@ -192,14 +243,16 @@ public class NaturalSelection implements ApplicationListener {
 	}
 	
 	private void cleanAnimals() {
+		int before = world.animals.size();
 		world.animals.clear();
-		for(int x = 0; x < world.getWidth(); x++) {
-			for(int y = 0; y < world.getHeight(); y++) {
+		for(int x = 0; x < world.width; x++) {
+			for(int y = 0; y < world.height; y++) {
 				Animal animal = world.grid.getBlock(x, y).animal;
 				if(animal != null)
 					world.animals.add(animal);
 			}
 		}
+		Gdx.app.debug("Clean up", "Animals removed: " + (before - world.animals.size()));
 	}
 	
 	private void processInput() {
@@ -208,12 +261,11 @@ public class NaturalSelection implements ApplicationListener {
 			Gdx.app.exit();
 		}
 		
+		touchPos.set(Gdx.input.getX(), Gdx.input.getY(), 0);
+		camera.unproject(touchPos);
+		int x = (int)(touchPos.x / blockWidth);
+		int y = (int)(touchPos.y / blockWidth);
 		if(gameState.animalSelected) {
-			Vector3 touchPos = new Vector3();
-			touchPos.set(Gdx.input.getX(), Gdx.input.getY(), 0);
-			camera.unproject(touchPos);
-			int x = (int)touchPos.x / blockWidth;
-			int y = (int)touchPos.y / blockWidth;
 			gameState.animal = world.grid.getBlock(x, y).animal;
 			gameState.animalSelected = false;
 		}
@@ -222,11 +274,13 @@ public class NaturalSelection implements ApplicationListener {
 		worldStats.visible = gameState.showWorldStats;
 		
 		pauseMenu.visible = gameState.pause;
-		if(gameState.pause && gameState.animal != null) {
-			//animalAgeField.setRange(0, gameState.animal.lifeSpan);
+		if(gameState.pause && gameState.animal != null) {			
 			animalAgeLabel.setText("Age: " + gameState.animal.age);
+			animalDietLabel.setText("Diet: " + Diet.getDiet(gameState.animal.diet));
+			animalSpeedLabel.setText("Speed: " + gameState.animal.speed);
+			animalCanFlyLabel.setText("Can fly: " + gameState.animal.canFly);
+			animalCanSwimLabel.setText("Can swim: " + gameState.animal.canSwim);
 		}
-		
 	}
 	
 	private void prepareWorldStats() {
@@ -251,8 +305,8 @@ public class NaturalSelection implements ApplicationListener {
 
 	private void renderWorld() {
 		Block block;
-		for (int x = 0; x < world.getWidth(); x++) {
-			for (int y = 0; y < world.getHeight(); y++) {
+		for (int x = 0; x < world.width; x++) {
+			for (int y = 0; y < world.height; y++) {
 				block = world.grid.getBlock(x, y);
 				if(block.animal == null) {
 					if (block.blockType == BlockType.IMPASSABLE_GROUND) {
@@ -280,9 +334,9 @@ public class NaturalSelection implements ApplicationListener {
 	@Override
 	public void resize(int width, int height) {
 		camera.setToOrtho(false, width, height);
-		camera.update(true);
-		blockWidth = width / world.getWidth();
-		blockHeight = height / world.getHeight();
+		camera.update();
+		blockWidth = (float)width / world.width;
+		blockHeight = (float)height / world.height;
 		
 		screenWidth = width;
 		screenHeight = height;
@@ -303,9 +357,10 @@ public class NaturalSelection implements ApplicationListener {
 		int height = screenHeight / BASEBLOCKSIZE;
 		
 		world = new World(width, height, 13);
-		world.maxPopulation = Math.min(width * height / BASEBLOCKSIZE, 1000);
+		int max = Gdx.app.getType() == ApplicationType.Desktop ? 5000 : 500;
+		world.maxPopulation = Math.min((int)(width * height * 0.65f), max);
 		
-		blockWidth = screenWidth / width;
-		blockHeight = screenHeight / height;
+		blockWidth = (float)screenWidth / width;
+		blockHeight = (float)screenHeight / height;
 	}
 }

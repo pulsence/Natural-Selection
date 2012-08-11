@@ -3,6 +3,7 @@ package com.pulsence.naturalSelection.evo;
 import java.util.Random;
 
 public class Animal {
+	// Base traits
 	public int size;
 	public int speed;
 	public int weight;
@@ -13,6 +14,10 @@ public class Animal {
 	public int diet;
 	public int strength;
 	public int lifeSpan;
+	
+	// Extra traits
+	public boolean canSwim = false;
+	public boolean canFly = false;
 	
 	public int x;
 	public int y;
@@ -31,12 +36,17 @@ public class Animal {
 		
 		//Have a child
 		if((reproductionRate - stepSinceReproduce) * World.random.nextFloat() < 2 &&
-				world.animals.size() + birthCount < world.maxPopulation) {
+			world.animals.size() + birthCount < world.maxPopulation) {
 			for(int i = 0; i < birthCount; i++) {
-				Animal child = mutateAnimal(World.random, world.grid);
-				if(child != null) {
-					world.animals.add(child);
-					world.grid.getBlock(child.x, child.y).animal = child;
+				if(actualEnergy > 15) {
+					Animal child = mutateAnimal(World.random, world.grid);
+					if(child != null) {
+						world.animals.add(child);
+						world.grid.getBlock(child.x, child.y).animal = child;
+					} else {
+						break;
+					}
+					actualEnergy -= 5;
 				}
 			}
 			stepSinceReproduce = -1;
@@ -50,32 +60,32 @@ public class Animal {
 			int closestY = 0;
 			Block block;
 			int closest = Integer.MAX_VALUE;
-			
-			for(int x = this.x - speed; x <= this.x + speed; x++) {
-				for(int y = this.y - speed; y <= this.y + speed; y++) {
-					block = world.grid.getBlock(x, y);
+			// Search for food
+			for(int tx = this.x - speed; tx <= this.x + speed; tx++) {
+				for(int ty = this.y - speed; ty <= this.y + speed; ty++) {
+					block = world.grid.getBlock(tx, ty);
 					if( (block.blockType == BlockType.VEGETATION && diet == Diet.HERBIVORE) ||
 						(block.animal != null && diet == Diet.CARNIVORE) ||
 						((block.blockType == BlockType.VEGETATION || block.animal != null) && diet == Diet.OMNIVORE)) {
-						int dist = distance(x, y);
+						int dist = distance(tx, ty);
 						if(dist < closest) {
-							closestX = x;
-							closestY = y;
+							closestX = tx;
+							closestY = ty;
 							closest = dist;
 						}
 					}
 				}
 			}
-			
+			// Go after food
 			world.grid.getBlock(x, y).animal = null;			
 			for(int i = 0; i < speed; i++) {
-				if(closestY < y && validMove(world.grid, x, y - 1)) { //Move down
+				if(closestY < y && validMove(world.grid, this, x, y - 1)) { //Move down
 					y--;
-				} else if (closestY > y && validMove(world.grid, x, y + 1)) { //Move up
+				} else if (closestY > y && validMove(world.grid, this, x, y + 1)) { //Move up
 					y++;
-				} else if (closestX < x && validMove(world.grid, x, x - 1)) { //Move right
+				} else if (closestX < x && validMove(world.grid, this, x, x - 1)) { //Move right
 					x--;
-				} else if (closestX > x && validMove(world.grid, x, x + 1)) { //Move left
+				} else if (closestX > x && validMove(world.grid, this, x, x + 1)) { //Move left
 					x++;
 				} else if (x == closestX && y == closestY) {
 					actualEnergy += 5;
@@ -97,21 +107,22 @@ public class Animal {
 		}
 		
 		//Wonder aimlessly
-		world.grid.getBlock(x, y).animal = null;	
+		world.grid.getBlock(x, y).animal = null;
+		int direction;
 		for(int i = 0; i < speed; i++) {
-			int direction = World.random.nextInt(4);
-			if(direction == 0 && validMove(world.grid, x, y - 1)) { //Move down
+			direction = World.random.nextInt(4);
+			if(direction == 0 && validMove(world.grid, this, x, y - 1)) { //Move down
 				y--;
-			} else if (direction == 1 && validMove(world.grid, x, y + 1)) { //Move up
+			} else if (direction == 1 && validMove(world.grid, this, x, y + 1)) { //Move up
 				y++;
-			} else if (direction == 2 && validMove(world.grid, x, x - 1)) { //Move right
+			} else if (direction == 2 && validMove(world.grid, this, x, x - 1)) { //Move right
 				x--;
-			} else if (direction == 3 && validMove(world.grid, x, x + 1)) { //Move left
+			} else if (direction == 3 && validMove(world.grid, this, x, x + 1)) { //Move left
 				x++;
 			}
 			
-			if((diet == Diet.HERBIVORE || diet == Diet.OMNIVORE) &&
-					world.grid.getBlock(x, y).blockType == BlockType.VEGETATION) {
+			if( diet != Diet.CARNIVORE &&
+				world.grid.getBlock(x, y).blockType == BlockType.VEGETATION) {
 				actualEnergy += 5;
 				if(actualEnergy > maxEnergy) {
 					actualEnergy = maxEnergy;
@@ -123,10 +134,11 @@ public class Animal {
 		updateCounters();
 	}
 	
-	private boolean validMove(Grid grid, int x, int y) {
+	protected static boolean validMove(Grid grid, Animal animal, int x, int y) {
 		Block block = grid.getBlock(x, y);
-		return block.blockType != BlockType.IMPASSABLE_GROUND || 
-			   block.animal != null;
+		return (animal.canFly || (block.blockType != BlockType.IMPASSABLE_GROUND)) && 
+			   (animal.canSwim || (block.blockType != BlockType.WATER)) &&
+			   block.animal == null;
 	}
 	
 	private void updateCounters() {
@@ -151,7 +163,7 @@ public class Animal {
 		child.weight = this.weight;
 		
 		// now mutate a single trait
-		int trait = rand.nextInt(11);
+		int trait = rand.nextInt(13);
 		switch (trait) {
 			case 0 : child.size = warpValue(size, rand);
 					 break;
@@ -176,13 +188,16 @@ public class Animal {
 				 	 break;
 			case 10 : child.diet = rand.nextInt(3);
 				 	 break;
+			case 11 : child.canFly = canFly ? false : true;
+					 break;
+			case 12 : child.canSwim = canSwim ? false : true;
 		}
 		
 		child.x = -1;
 		child.y = -1;
 		for(int tx = x - 1; tx < x + 2; tx++) {
 			for(int ty = y - 1; ty < y + 2; ty++) {
-				if(validMove(grid, tx, ty)) {
+				if(validMove(grid, child, tx, ty)) {
 					child.x = tx;
 					child.y = ty;
 					break;
@@ -213,7 +228,9 @@ public class Animal {
 		sb.append("Age: " + age + "\n").
 		   append("Diet :" + Diet.getDiet(diet) + "\n").
 		   append("Speed :" + speed + "\n").
-		   append("Energy :" + actualEnergy + "\n");
+		   append("Energy :" + actualEnergy + "\n").
+		   append("Can fly: " + canFly + "\n").
+		   append("Can swim: " + canSwim + "\n");
 		return sb.toString();
 	}
 }
